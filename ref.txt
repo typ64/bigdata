@@ -1,0 +1,54 @@
+$HADOOP_HOME/sbin/start-dfs.sh
+$HADOOP_HOME/sbin/start-yarn.sh
+
+
+$SPARK_HOME/bin/spark-shell
+--%SPARK_HOME%/bin/spark-shell
+val sqlContext = new org.apache.spark.sql.SQLContext(sc)
+import sqlContext.implicits._
+val df = sqlContext.read.json("/SparkStuff/twitter_data_tweets.json")
+df.registerTempTable("cs490")
+import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.Row
+
+--alternatives
+4. val q4 = sqlContext.sql("select entities.hashtags.text, count(*) from cs490 group by entities.hashtags.text") 
+5. val q5 = sqlContext.sql("select entities.urls.url, count(*) from cs490 group by entities.urls.url order by count(*) desc")
+
+--print qurey plan
+val x = sqlContext.sql("blah")
+x.expalin
+
+--convert to RDD
+step14.rdd
+step14.rdd.coalesce(1).saveAsTextFile("/SparkStuff/step14.csv")
+
+--get item using Scala
+$"pos".getItem(0)
+
+--turn off join flag
+spark.conf.set("spark.sql.crossJoin.enabled", "true")
+
+--select hashtags
+val res = sqlContext.sql("select hashtagEntities from cs490")
+
+--show results
+df.show()
+
+--run wordcount
+$SPARK_HOME/bin/spark-submit run-example JavaWordCount /SparkStuff/twitter_data_tweets.json	
+
+--put files on hdfs
+hadoop fs -put /your/file file/location/on_hdfs
+
+--JSON Entity Relations
+Relation[contributors#8,coordinates#9,created_at#10,display_text_range#11,entities#12,extended_entities#13,extended_tweet#14,favorite_count#15L,favorited#16,filter_level#17,geo#18,id#19L,id_str#20,in_reply_to_screen_name#21,in_reply_to_status_id#22L,in_reply_to_status_id_str#23,in_reply_to_user_id#24L,in_reply_to_user_id_str#25,is_quote_status#26,lang#27,place#28,possibly_sensitive#29,quote_count#30L,quoted_status#31,... 12 more fields] json
+|contributors|coordinates|          created_at|display_text_range|            entities|   extended_entities|extended_tweet|favorite_count|favorited|filter_level| geo|                id|            id_str|in_reply_to_screen_name|in_reply_to_status_id|in_reply_to_status_id_str|in_reply_to_user_id|in_reply_to_user_id_str|is_quote_status|lang|place|possibly_sensitive|quote_count|       quoted_status|  quoted_status_id|quoted_status_id_str|reply_count|retweet_count|retweeted|    retweeted_status|              source|                text| timestamp_ms|truncated|                user|withheld_in_countries|
+|contributors|coordinates|created_at                    |display_text_range|entities                                                                                                                                               |extended_entities|extended_tweet|favorite_count|favorited|filter_level|geo |id                |id_str            |in_reply_to_screen_name|in_reply_to_status_id|in_reply_to_status_id_str|in_reply_to_user_id|in_reply_to_user_id_str|is_quote_status|lang|place|possibly_sensitive|quote_count|quoted_status|quoted_status_id|quoted_status_id_str|reply_count|retweet_count|retweeted|retweeted_status|source                                              |text                                                                                                                       |timestamp_ms |truncated|user                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |withheld_in_countries|
++------------+-----------+------------------------------+------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------+-----------------+--------------+--------------+---------+------------+----+------------------+------------------+-----------------------+---------------------+-------------------------+-------------------+-----------------------+---------------+----+-----+------------------+-----------+-------------+----------------+--------------------+-----------+-------------+---------+----------------+----------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------+-------------+---------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+---------------------+
+|null        |null       |Mon Oct 16 08:13:32 +0000 2017|null              |[WrappedArray(),null,WrappedArray(),WrappedArray([ift.tt/2zrHjfG,http://ift.tt/2zrHjfG,WrappedArray(100, 123),https://t.co/OGp4do2St1]),WrappedArray()]|null             |null          |0             |false    |low         |null|919838708681138176|919838708681138176|null                   |null                 |null                     |null               |null                   |false          |fr  |null |false             |0          |null         |null            |null                |0          |0            |false    |null            |<a href="https://ifttt.com" rel="nofollow">IFTTT</a>|La stratégie de Donald Trump avec les régimes terroristes d'Iran et de Corée du Nord, par le Lt ... https://t.co/OGp4do2St1|1508141612583|false    |[false,Tue Jun 28 15:20:23 +0000 2016,true,false,Tweets on #Qatar #Russia #Iran,16,null,17,null,21,false,747811890991087617,747811890991087617,false,fr,1,Afrique,Pascal,null,F5F8FA,,,false,https://pbs.twimg.com/profile_banners/747811890991087617/1467127590,http://pbs.twimg.com/profile_images/747813271005179904/zV0hf8AP_normal.jpg,https://pbs.twimg.com/profile_images/747813271005179904/zV0hf8AP_normal.jpg,1DA1F2,C0DEED,DDEEF6,333333,true,false,PascaLegrand,33814,Dublin,none,null,3600,false]|null
+
+|contributors|coordinates|          created_at|display_text_range|            entities|extended_entities|extended_tweet|favorite_count|favorited|filter_level| geo|                id|            id_str|in_reply_to_screen_name|in_reply_to_status_id|in_reply_to_status_id_str|in_reply_to_user_id|in_reply_to_user_id_str|is_quote_status|lang|place|possibly_sensitive|quote_count|quoted_status|quoted_status_id|quoted_status_id_str|reply_count|retweet_count|retweeted|retweeted_status|              source|                text| timestamp_ms|truncated|                user|withheld_in_countries|
++------------+-----------+--------------------+------------------+--------------------+-----------------+--------------+--------------+---------+------------+----+------------------+------------------+-----------------------+---------------------+-------------------------+-------------------+-----------------------+---------------+----+-----+------------------+-----------+-------------+----------------+--------------------+-----------+-------------+---------+----------------+--------------------+--------------------+-------------+---------+--------------------+---------------------+
+|        null|       null|Mon Oct 16 08:13:...|              null|[WrappedArray(),n...|             null|          null|             0|    false|         low|null|919838708681138176|919838708681138176|                   null|                 null|                     null|               null|                   null|          false|  fr| null|             false|          0|         null|            null|                null|          0|            0|    false|            null|<a href="https://...|La stratégie de D...|1508141612583|    false|[false,Tue Jun 28...|                 null|
++------------+-----------+--------------------+------------------+--------------------+-----------------+--------------+--------------+---------+------------+----+------------------+------------------+-----------------------+---------------------+-------------------------+-------------------+-----------------------+---------------+----+-----+------------------+-----------+-------------+----------------+--------------------+-----------+-------------+---------+----------------+--------------------+--------------------+-------------+---------+--------------------+---------------------+

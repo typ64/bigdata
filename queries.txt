@@ -1,0 +1,183 @@
+:Linux Terminal:
+$HADOOP_HOME/sbin/start-dfs.sh
+$HADOOP_HOME/sbin/start-yarn.sh
+$SPARK_HOME/bin/spark-shell
+val df = spark.read.json("/SparkStuff/twitter_data_tweets.json")
+import org.apache.spark.sql.functions._
+import org.apache.spark.streaming._
+
+:Windows Command Prompt:
+%SPARK_HOME%/bin/spark-shell
+val sqlContext = new org.apache.spark.sql.SQLContext(sc)
+import sqlContext.implicits._
+val df = sqlContext.read.json("/SparkStuff/twitter_data_tweets.json")
+df.registerTempTable("cs490")
+import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.Row
+import org.apache.spark.sql.functions._
+import org.apache.spark.streaming._
+
+1) 
+val step1 = sqlContext.sql("select id, created_at from cs490")
+step1.show(100, false)
+step1.coalesce(1).write.format("com.databricks.spark.csv").option("header", "true").save("/SparkStuff/step1.csv")
+
+2) 
+val step2 = sqlContext.sql("select User.id, User.followers_count, User.friends_count from cs490").orderBy("id")
+step2.show(false)
+step2.coalesce(1).write.format("com.databricks.spark.csv").option("header", "true").save("/SparkStuff/step2.csv")
+
+3)
+val step3 = sqlContext.sql("select id as tweet_id, User.id as user_id from cs490 where lang='en'")
+step3.show(false)
+step3.coalesce(1).write.format("com.databricks.spark.csv").option("header", "true").save("/SparkStuff/step3.csv")
+
+4)
+val step4_hashtags = sqlContext.sql("select explode(Entities.hashtags.text) from cs490").orderBy("col")
+val temp = step4_hashtags.rdd.map(x=>(x.mkString(""),1))
+val output = temp.reduceByKey((a,b) => (a + b))
+val res = output.sortByKey()
+res.foreach(println)
+res.coalesce(1).saveAsTextFile("/SparkStuff/step4")
+
+5)
+val step5_hashtags = sqlContext.sql("select explode(Entities.urls.url) from cs490")
+val words = step5_hashtags.rdd.map(x=>(x.mkString(""),1))
+val counts = words.reduceByKey((a,b) => a + b)
+val sorted = counts.sortBy(_._2,false)
+sorted.foreach(println)
+sorted.coalesce(1).saveAsTextFile("/SparkStuff/step5")
+
+6)
+val step6_startPos = sqlContext.sql("select Entities.hashtags.text, explode(Entities.hashtags.indices[1]) as indices from cs490").orderBy("indices")
+val words = step6_startPos.rdd.map(x=>x.mkString(""))
+val step6 = words.flatMap(s => s.split("WrappedArray()").map(_.trim)).filter(_.nonEmpty)
+step6.foreach(println)
+step6.coalesce(1).saveAsTextFile("/SparkStuff/step6")
+
+7)
+val step7 = sqlContext.sql("select user.time_zone, avg(user.followers_count) from cs490 where favorited = false group by user.time_zone")
+step7.show(false)
+step7.coalesce(1).write.format("com.databricks.spark.csv").option("header", "true").save("/SparkStuff/step7.csv")
+
+8)
+val step8 = sqlContext.sql("select user.time_zone, avg(user.friends_count) from cs490 where retweeted = false AND user.verified = false group by user.time_zone")
+step8.show(false)
+step8.coalesce(1).write.format("com.databricks.spark.csv").option("header", "true").save("/SparkStuff/step8.csv")
+
+9)
+val x = sqlContext.sql("select id,user.time_zone from cs490 where user.lang = 'en'")
+val y = sqlContext.sql("select id,user.time_zone from cs490 where user.verified = true")
+x.registerTempTable("X")
+y.registerTempTable("Y")
+val step9 = sqlContext.sql("select X.id as X_id, Y.id as Y_id from X,Y where X.time_zone=Y.time_zone")
+step9.show(false)
+step9.coalesce(1).write.format("com.databricks.spark.csv").option("header", "true").save("/SparkStuff/step9.csv")
+
+10)
+val x = sqlContext.sql("select explode(entities.hashtags.text) as hashtag1 from cs490 where user.time_zone='Pacific Time (US & Canada)'")
+val y = sqlContext.sql("select explode(entities.hashtags.text) as hashtag2 from cs490 where user.time_zone='Eastern Time (US & Canada)'")
+x.registerTempTable("X")
+y.registerTempTable("Y")
+val step10 = sqlContext.sql("select * from X,Y where X.hashtag1=Y.hashtag2")
+step10.show(false)
+step10.coalesce(1).write.format("com.databricks.spark.csv").option("header", "true").save("/SparkStuff/step10.csv")
+
+11)
+val x = sqlContext.sql("select user.id, user.location, user.lang, user.friends_count, user.followers_count from cs490")
+x.registerTempTable("X")
+val step11 = sqlContext.sql("select id, location, (select avg(friends_count) from X)as friends_count_avg, (select avg(followers_count) from X) as follower_count_avg from X where lang NOT LIKE 'en%'")
+step11.show(false)
+step11.coalesce(1).write.format("com.databricks.spark.csv").option("header", "true").save("/SparkStuff/step11.csv")
+
+12)
+val df = sqlContext.read.json("/SparkStuff/twitter_data_tweets.json")
+val Xds = df.select("user.id", "user.location", "user.lang", "user.friends_count", "user.followers_count")
+case class XClass (id:String,location:String,lang:String,friends_count:String,followers_count:String)
+val X = Xds.as[XClass]
+val step12 = X.select("id", "location").where("followers_count > 10")
+step12.show(false)
+step12.coalesce(1).write.format("com.databricks.spark.csv").option("header", "true").save("/SparkStuff/step12.csv")
+
+13)
+val df = sqlContext.read.json("/SparkStuff/twitter_data_tweets.json")
+val Xds = df.select("user.id", "user.location", "user.lang", "user.friends_count", "user.followers_count")
+case class XClass (id:String,location:String,lang:String,friends_count:String,followers_count:String)
+val X = Xds.as[XClass]
+val X1 = X.select("id","location","lang")
+val X2 = X.groupBy("lang").max("friends_count")
+val step13 = X1.join(X2, "lang")
+step13.show(false)
+step13.coalesce(1).write.format("com.databricks.spark.csv").option("header", "true").save("/SparkStuff/step13.csv")
+
+14)
+val df = sqlContext.read.json("/SparkStuff/twitter_data_tweets.json")
+val X = df.select("user.id", "user.location", "user.lang", "user.friends_count", "user.followers_count")
+val Y = df.select("user.id").where("user.verified = true")
+X.createOrReplaceTempView("Xtable")
+Y.createOrReplaceTempView("Ytable")
+val step14 = spark.sql("select * from Xtable LEFT ANTI JOIN Ytable ON (Xtable.id = Ytable.id)")
+step14.show(false)
+step14.coalesce(1).write.format("com.databricks.spark.csv").option("header", "true").save("/SparkStuff/step14.csv")
+
+15)
+val df = sqlContext.read.json("/SparkStuff/twitter_data_tweets.json")
+val X = df.select("user.id", "user.location", "user.lang")
+val Y = df.select("user.id","user.friends_count").where("user.verified = 'false'")
+case class XClass (id:String,location:String,lang:String)
+case class YClass (id:String,friends_count:String)
+X.createOrReplaceTempView("Xtable")
+Y.createOrReplaceTempView("Ytable")
+val step15 = spark.sql("select * from Xtable where EXISTS (select id from Ytable where Xtable.id = Ytable.id AND friends_count > 10)")
+step15.show(false)
+step15.coalesce(1).write.format("com.databricks.spark.csv").option("header", "true").save("/SparkStuff/step15.csv")
+
+Extra Credit)
+val tweets = spark.read.json("/SparkStuff/twitter_data_tweets.json")
+tweets.createOrReplaceTempView("tbl")
+import org.apache.spark.sql.expressions.Window
+val X = spark.sql("select user.id, user.friends_count, user.lang from tbl")
+val windowLang = Window.partitionBy("lang").orderBy("id")
+
+:rank
+X.withColumn("rank", rank over windowLang)
+X.createOrReplaceTempView("smalltable")
+val rank = spark.sql("select id, friends_count, lang, rank() over (partition by lang order by id) as rank from smalltable")
+rank.show(false)
+rank.coalesce(1).write.format("com.databricks.spark.csv").option("header", "true").save("/SparkStuff/ec_rank.csv")
+
+:Percent rank
+val per_rank = spark.sql("select id, friends_count, lang, percent_rank() over (partition by lang order by id) as p_rank from smalltable")
+per_rank.show(false)
+per_rank.coalesce(1).write.format("com.databricks.spark.csv").option("header", "true").save("/SparkStuff/ec_per_rank.csv")
+
+:Row number
+val row_num = spark.sql("select id, friends_count, lang, row_number() over (partition by lang order by id) as r_num from smalltable")
+row_num.show(false)
+row_num.coalesce(1).write.format("com.databricks.spark.csv").option("header", "true").save("/SparkStuff/ec_row_num.csv")
+
+:Ntile
+val ntile = spark.sql("select id, friends_count, lang, ntile(3) over (partition by lang order by id) as n_tile from smalltable")
+ntile.show(false)
+ntile.coalesce(1).write.format("com.databricks.spark.csv").option("header", "true").save("/SparkStuff/ec_ntile.csv")
+
+:Cummulative distribution
+val cd = spark.sql("select id, friends_count, lang, cume_dist() over (partition by lang order by id) as c_dist from smalltable")
+cd.show(false)
+cd.coalesce(1).write.format("com.databricks.spark.csv").option("header", "true").save("/SparkStuff/ec_cumm_dis.csv")
+
+:Aggregate functions
+val af = spark.sql("select id, friends_count, lang, max(friends_count) over (partition by lang order by id) as maxi from smalltable")
+af.show(false)
+af.coalesce(1).write.format("com.databricks.spark.csv").option("header", "true").save("/SparkStuff/ec_agg_func.csv")
+
+:Aggregation without window operations/partition by
+val af_without_part = spark.sql("select lang, avg(friends_count) as avgf, max(friends_count) as maxf from smalltable group by lang")
+af_without_part.show(false)
+af_without_part.coalesce(1).write.format("com.databricks.spark.csv").option("header", "true").save("/SparkStuff/ec_agg_func_without_part.csv")
+
+
+
+
+
+
